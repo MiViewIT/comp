@@ -1,26 +1,11 @@
-import { PrismaPlugin } from '@prisma/nextjs-monorepo-workaround-plugin';
-import { withBotId } from 'botid/next/config';
 import type { NextConfig } from 'next';
 import path from 'path';
-
 import './src/env.mjs';
 
 const isStandalone = process.env.NEXT_OUTPUT_STANDALONE === 'true';
-const isLocalEnvironment = (process.env.APP_ENVIRONMENT ?? '').toLowerCase() === 'local';
-const isSelfHosting = (() => {
-  const raw = process.env.SELF_HOSTING;
-  if (raw) {
-    const normalized = raw.toLowerCase();
-    if (normalized === 'true' || normalized === '1') return true;
-    if (normalized === 'false' || normalized === '0') return false;
-  }
-  return isLocalEnvironment;
-})();
 
 const config: NextConfig = {
-  // Ensure Turbopack can import .md files as raw strings during dev
   turbopack: {
-    root: path.join(__dirname, '..', '..'),
     rules: {
       '*.md': {
         loaders: ['raw-loader'],
@@ -28,34 +13,24 @@ const config: NextConfig = {
       },
     },
   },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Very important, DO NOT REMOVE, it's needed for Prisma to work in the server bundle
-      config.plugins = [...config.plugins, new PrismaPlugin()];
-    }
-
-    // Enable importing .md files as raw strings during webpack builds
-    config.module = config.module || { rules: [] };
-    config.module.rules = config.module.rules || [];
-    config.module.rules.push({
+  // Ensure .md files can be imported as strings during webpack builds
+  webpack: (cfg) => {
+    cfg.module = cfg.module || { rules: [] };
+    cfg.module.rules = cfg.module.rules || [];
+    cfg.module.rules.push({
       test: /\.md$/,
       type: 'asset/source',
     });
-
-    return config;
+    return cfg;
   },
   // Use S3 bucket for static assets with app-specific path
   assetPrefix:
     process.env.NODE_ENV === 'production' && process.env.STATIC_ASSETS_URL
       ? `${process.env.STATIC_ASSETS_URL}/app`
       : '',
-  env: {
-    NEXT_PUBLIC_DISABLE_IMAGE_OPTIMIZATION: String(isSelfHosting),
-  },
   reactStrictMode: true,
   transpilePackages: ['@trycompai/db', '@prisma/client'],
   images: {
-    unoptimized: isSelfHosting,
     remotePatterns: [
       {
         protocol: 'https',
@@ -110,4 +85,4 @@ const config: NextConfig = {
   },
 };
 
-export default withBotId(config);
+export default config;

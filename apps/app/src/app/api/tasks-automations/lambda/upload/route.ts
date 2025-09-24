@@ -1,19 +1,39 @@
-import { s3Client } from '@/app/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
+
+const DEFAULTS = {
+  bucket: 'comp-testing-lambda-tasks',
+  region: 'us-east-1',
+};
 
 export async function POST(req: Request) {
   try {
-    const { orgId, taskId, content }: { orgId: string; taskId: string; content: string } =
+    const {
+      orgId,
+      taskId,
+      content,
+      bucket,
+      region,
+    }: { orgId: string; taskId: string; content: string; bucket?: string; region?: string } =
       await req.json();
     if (!orgId || !taskId || typeof content !== 'string') {
       return NextResponse.json({ error: 'Missing orgId, taskId or content' }, { status: 400 });
     }
 
-    const resolvedBucket = process.env.TASKS_AUTOMATION_BUCKET;
+    const resolvedBucket = bucket || DEFAULTS.bucket;
+    const resolvedRegion = region || DEFAULTS.region;
     const key = `${orgId}/${taskId}.js`;
 
-    await s3Client.send(
+    const credentials =
+      process.env.APP_AWS_ACCESS_KEY_ID && process.env.APP_AWS_SECRET_ACCESS_KEY
+        ? {
+            accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID as string,
+            secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY as string,
+          }
+        : undefined;
+
+    const s3 = new S3Client({ region: resolvedRegion, credentials });
+    await s3.send(
       new PutObjectCommand({
         Bucket: resolvedBucket,
         Key: key,

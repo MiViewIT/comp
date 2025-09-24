@@ -4,7 +4,15 @@ import { Models } from '@/ai/constants';
 import { cn } from '@/lib/utils';
 import { useChat } from '@ai-sdk/react';
 import { Button } from '@comp/ui/button';
-import { Play, Zap } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@comp/ui/dialog';
+import { AlertCircle, CheckCircle2, Play, Sparkles, Zap } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import {
@@ -19,19 +27,25 @@ import { Panel, PanelHeader } from '../panels/panels';
 import {
   CodeViewer,
   EmptyState,
-  TestResultsPanel,
   ViewModeSwitch,
   WorkflowSkeleton,
   WorkflowStepCard,
 } from './components';
-import type { TestResult } from './types';
+
+interface TestResult {
+  status: 'success' | 'error';
+  message?: string;
+  data?: any;
+  error?: string;
+  logs?: string[];
+}
 
 interface Props {
   className?: string;
 }
 
 export function WorkflowVisualizerSimple({ className }: Props) {
-  const { scriptGenerated, viewMode, setViewMode, setScriptUrl } = useTaskAutomationStore();
+  const { scriptGenerated, viewMode, setViewMode } = useTaskAutomationStore();
   const { orgId, taskId } = useParams<{ orgId: string; taskId: string }>();
   const { chat } = useSharedChatContext();
   const { sendMessage } = useChat<ChatUIMessage>({ chat });
@@ -58,11 +72,6 @@ export function WorkflowVisualizerSimple({ className }: Props) {
       setScriptGenerated(true, script.key);
     }
   }, [script, scriptGenerated]);
-
-  useEffect(() => {
-    // Update store with script URL (empty string if no script exists)
-    setScriptUrl(script?.key || undefined);
-  }, [script, setScriptUrl]);
 
   const {
     execute,
@@ -97,7 +106,6 @@ export function WorkflowVisualizerSimple({ className }: Props) {
         data: executionResult.data,
         logs: executionResult.logs,
         error: executionResult.error || (hasErrorInData ? executionResult.data.error : undefined),
-        summary: (executionResult as any).summary,
       };
     }
     return null;
@@ -135,7 +143,7 @@ Please fix the automation script to resolve this error.`;
     // Send the error to the chat
     sendMessage(
       { text: errorMessage },
-      { body: { modelId: Models.OpenAIGPT5Mini, reasoningEffort: 'medium', orgId, taskId } },
+      { body: { modelId: Models.OpenAIGPT5, reasoningEffort: 'medium', orgId, taskId } },
     );
 
     // Close the dialog
@@ -178,46 +186,33 @@ Please fix the automation script to resolve this error.`;
         </div>
       </PanelHeader>
 
-      <div className="flex-1 overflow-auto">
-        {/* Show Test Results Panel INSTEAD of regular content when testing/results available */}
-        {isExecuting || testResult ? (
-          <TestResultsPanel
-            isExecuting={isExecuting}
-            result={testResult}
-            onLetAIFix={handleLetAIFix}
-            onBack={() => resetExecution()}
-          />
-        ) : (
-          /* Regular Content - Only show when NOT testing */
-          <div className={cn('h-full', viewMode === 'visual' && 'p-8')}>
-            <div className={cn(viewMode === 'visual' && 'max-w-3xl mx-auto')}>
-              {viewMode === 'visual' ? (
-                // Visual Mode
-                showLoading ? (
-                  <WorkflowSkeleton />
-                ) : steps.length > 0 ? (
-                  <div className="space-y-6 pb-6 max-w-md mx-auto">
-                    {steps.map((step, index) => (
-                      <WorkflowStepCard
-                        key={step.id}
-                        step={step}
-                        index={index}
-                        showConnection={index > 0}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState type="workflow" />
-                )
-              ) : (
-                // Code Mode
-                <div className="h-full">
-                  <CodeViewer content={script?.content || ''} isLoading={showLoading} />
-                </div>
-              )}
+      <div className={cn('flex-1 overflow-auto', viewMode === 'visual' && 'p-8')}>
+        <div className={cn(viewMode === 'visual' && 'max-w-3xl mx-auto')}>
+          {viewMode === 'visual' ? (
+            // Visual Mode
+            showLoading ? (
+              <WorkflowSkeleton />
+            ) : steps.length > 0 ? (
+              <div className="space-y-6 pb-6">
+                {steps.map((step, index) => (
+                  <WorkflowStepCard
+                    key={step.id}
+                    step={step}
+                    index={index}
+                    showConnection={index > 0}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState type="workflow" />
+            )
+          ) : (
+            // Code Mode
+            <div className="h-full">
+              <CodeViewer content={script?.content || ''} isLoading={showLoading} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Fixed Test Button */}
@@ -236,6 +231,63 @@ Please fix the automation script to resolve this error.`;
           </div>
         </div>
       )}
+
+      {/* Test Result Dialog */}
+      <Dialog open={!!testResult} onOpenChange={() => resetExecution()}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {testResult?.status === 'success' ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  Test Successful
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  Test Failed
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {testResult?.message || testResult?.error || 'View the test results below'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto space-y-4">
+            {testResult && testResult.logs && testResult.logs.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Execution Logs:</h4>
+                <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto max-h-48 overflow-y-auto">
+                  {testResult.logs.join('\n')}
+                </pre>
+              </div>
+            )}
+
+            {testResult && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Function Output:</h4>
+                <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
+                  {testResult.data !== undefined && testResult.data !== null
+                    ? JSON.stringify(testResult.data, null, 2)
+                    : testResult.status === 'success'
+                      ? '(No output returned)'
+                      : '(Execution failed)'}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          {testResult?.status === 'error' && (
+            <DialogFooter>
+              <Button onClick={handleLetAIFix}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Let AI Fix It
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </Panel>
   );
 }

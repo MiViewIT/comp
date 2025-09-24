@@ -1,8 +1,7 @@
-import { s3Client } from '@/app/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+const s3 = new S3Client({ region: 'us-east-1' });
 
 export async function POST(req: Request) {
   try {
@@ -14,12 +13,11 @@ export async function POST(req: Request) {
 
     // Determine the S3 key based on the type
     const s3Key = type === 'lambda' ? `${orgId}/${taskId}.js` : `${orgId}/${taskId}.${type}.js`;
-    const bucket = process.env.TASKS_AUTOMATION_BUCKET;
 
     // Upload to S3
-    await s3Client.send(
+    await s3.send(
       new PutObjectCommand({
-        Bucket: bucket,
+        Bucket: 'comp-testing-lambda-tasks',
         Key: s3Key,
         Body: content,
         ContentType: 'application/javascript',
@@ -36,7 +34,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      bucket: bucket,
+      bucket: 'comp-testing-lambda-tasks',
       key: s3Key,
       message: 'Script uploaded successfully',
     });

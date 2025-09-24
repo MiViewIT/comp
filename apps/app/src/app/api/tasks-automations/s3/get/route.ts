@@ -1,8 +1,7 @@
-import { s3Client } from '@/app/s3';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+const s3 = new S3Client({ region: 'us-east-1' });
 
 export async function GET(req: Request) {
   try {
@@ -14,9 +13,9 @@ export async function GET(req: Request) {
     }
 
     // Get object from S3
-    const { Body } = await s3Client.send(
+    const { Body } = await s3.send(
       new GetObjectCommand({
-        Bucket: process.env.TASKS_AUTOMATION_BUCKET,
+        Bucket: 'comp-testing-lambda-tasks',
         Key: key,
       }),
     );

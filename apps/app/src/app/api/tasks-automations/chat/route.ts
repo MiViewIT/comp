@@ -1,4 +1,4 @@
-import { Models } from '@/ai/constants';
+import { DEFAULT_MODEL } from '@/ai/constants';
 import { getAvailableModels, getModelOptions } from '@/ai/gateway';
 import { getTaskAutomationTools } from '@/ai/tools/task-automation-tools';
 import { db } from '@db';
@@ -15,10 +15,6 @@ import { type ChatUIMessage } from '../../../(app)/[orgId]/tasks/[taskId]/automa
 import automationPrompt from './automation-prompt.md';
 import lambdaPrompt from './prompt.md';
 
-// Ensure sufficient time for long-running automation orchestration
-export const runtime = 'nodejs';
-export const maxDuration = 300; // seconds (Vercel max)
-
 interface BodyData {
   messages: ChatUIMessage[];
   modelId?: string;
@@ -28,26 +24,17 @@ interface BodyData {
 }
 
 export async function POST(req: Request) {
-  const { isBot } = await checkBotId();
-  if (isBot) {
-    return NextResponse.json(
-      { error: 'Bot is not allowed to access this endpoint' },
-      { status: 401 },
-    );
+  const checkResult = await checkBotId();
+  if (checkResult.isBot) {
+    return NextResponse.json({ error: `Bot detected` }, { status: 403 });
   }
 
-  const [models, { messages, modelId = Models.OpenAIGPT5Mini, reasoningEffort, orgId, taskId }] =
+  const [models, { messages, modelId = DEFAULT_MODEL, reasoningEffort, orgId, taskId }] =
     await Promise.all([getAvailableModels(), req.json() as Promise<BodyData>]);
 
-  const model = models.find((m) => m.id === modelId);
-
+  const model = models.find((model) => model.id === modelId);
   if (!model) {
-    return NextResponse.json(
-      {
-        error: `Model ${modelId} not found., Valid models are: ${models.map((m) => m.id).join(', ')}`,
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: `Model ${modelId} not found.` }, { status: 400 });
   }
 
   // Validate required parameters
@@ -80,8 +67,11 @@ export async function POST(req: Request) {
     AVAILABLE_SECRETS: availableSecrets,
   });
   // Include Lambda prompt content.
-  // markdown loaded via webpack asset/source (string)
-  const fullPromptContext = `\n${lambdaPrompt}\n\n---\n`;
+  const fullPromptContext = `
+${lambdaPrompt}
+
+---
+`;
 
   const prompt = `${automationPrompt}\n\nFULL_PROMPT_CONTEXT:\n${fullPromptContext}\n\nACTUAL_VALUES_JSON:\n${actualValuesJson}`;
 

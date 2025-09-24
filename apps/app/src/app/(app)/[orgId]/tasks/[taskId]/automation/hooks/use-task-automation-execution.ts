@@ -61,7 +61,6 @@ export function useTaskAutomationExecution({
             data: data.output.output,
             error: data.output.error,
             logs: data.output.logs,
-            summary: data.output.summary,
             taskId: data.id,
           };
 

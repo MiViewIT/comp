@@ -35,7 +35,6 @@ export interface TaskAutomationExecutionResult {
   logs?: string[];
   taskId?: string;
   modelName?: string;
-  summary?: string;
 }
 
 export interface TaskAutomationTestResult {
@@ -112,7 +111,6 @@ export interface TaskAutomationStoreState {
   scriptGenerated: boolean;
   scriptPath?: string;
   viewMode: ViewMode;
-  scriptUrl?: string;
 }
 
 // ============================================================================

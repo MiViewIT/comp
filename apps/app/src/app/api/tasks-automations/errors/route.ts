@@ -9,12 +9,9 @@ import {
 import prompt from './prompt.md';
 
 export async function POST(req: Request) {
-  const { isBot } = await checkBotId();
-  if (isBot) {
-    return NextResponse.json(
-      { error: 'Bot is not allowed to access this endpoint' },
-      { status: 401 },
-    );
+  const checkResult = await checkBotId();
+  if (checkResult.isBot) {
+    return NextResponse.json({ error: `Bot detected` }, { status: 403 });
   }
 
   const body = await req.json();
@@ -25,7 +22,7 @@ export async function POST(req: Request) {
 
   const result = await generateObject({
     system: prompt,
-    model: Models.OpenAIGPT5Mini,
+    model: Models.OpenAIGPT5,
     providerOptions: {
       openai: {
         include: ['reasoning.encrypted_content'],

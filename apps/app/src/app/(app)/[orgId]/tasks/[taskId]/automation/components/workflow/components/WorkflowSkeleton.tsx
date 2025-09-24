@@ -4,7 +4,7 @@ import { Card, CardContent } from '@comp/ui/card';
 
 export function WorkflowSkeleton() {
   return (
-    <div className="space-y-6 max-w-md mx-auto">
+    <div className="space-y-6">
       {/* Animated Cards */}
       {[0, 1, 2].map((index) => (
         <div
